@@ -1,3 +1,4 @@
+# GUI
 from tkinter import *
 from tkinter import ttk #fancy style
 from tkinter import messagebox
@@ -25,42 +26,44 @@ import datetime
 class ArduinoData:
     def __init__(self, time = 0.0, acc = [], gyro = [] ):
         self.time = time
-        self.acc = acc
-        self.gyro = gyro
+        self.acc = acc  # accelerations
+        self.gyro = gyro  # angular velocities
 
     def __repr__(self):  # to represent in list() function
         return "t:" + str(self.time) + "acc:" + str(self.acc) + "gyr:" +str(self.gyro) + "\n"
 
 
-# control variables
-servMin=5
-servMax=175
-finZero=90
-# Serial stuff
-baudrates = [9600, 57600, 115200]
-mySerial = serial.Serial()
+# ************control variables*********************
+# ------------servo orientations-------------------
+servMin = 5
+servMax = 175
+finZero = 90  # neutral position of fins
+# ------------Serial variables-------------------
+baudrates = [9600, 57600, 115200]  # standard rates of serial communication
+mySerial = serial.Serial()  # object for serial I/O + management
 portList = serial.tools.list_ports.comports()
+# global variable for connection control
 connectCtrl = False  # serial.is_open doesnt prevent serial.in_waiting from throwing an exception
 sendCtrl = False
 streamCtrl = False
-# Graphs
+# -------------Graphs-----------------------------
 freezeGraphs = False
 # Data sets
 # received:
-dataCount = 10000
-dataIndex = 0
+dataCount = 100000  # length of data array, to speed up writing to memmory
+dataIndex = 0  # index of last data
 receivedList = [None] * dataCount
 timeList = []
-serList = []
-# to send:
+serList = []  # positions of servos
+# --------------control of data to send------------------------
 sendIndex = 0
 beginningTime = datetime.datetime.now()
 pauseTimeDelta = datetime.timedelta()  # set to zero
 
-# handlers
+# *****************************handlers**************************************
 def serialHandler():
     global sendIndex  # for some reason just this one
-    #global connectCtrl, sendIndex, sendCtrl, timeList, beginningTime
+    # global connectCtrl, sendIndex, sendCtrl, timeList, beginningTime
     if mySerial.is_open:
         if connectCtrl:  # reading
             try:
@@ -71,16 +74,16 @@ def serialHandler():
                     print("something went wrong")
                     e = sys.exc_info()[0]
                     print(e)
-        # writing
-        if sendCtrl and (len(timeList) >0) and (sendIndex < len(timeList)) and ((datetime.datetime.now() - beginningTime + pauseTimeDelta).total_seconds() >= timeList[sendIndex]): #
+        # wind tunnel testing program - sends data from  excel file with testing scheme
+        if sendCtrl and (len(timeList) > 0) and (sendIndex < len(timeList)) and ((datetime.datetime.now() - beginningTime + pauseTimeDelta).total_seconds() >= timeList[sendIndex]): #
             print("sending data")
             sendData()
             sendIndex += 1
     window.after(1, serialHandler)
 
 
-# GUI
-# Toplevel menu handlers
+# **************************GUI*********************************
+# ---------------Toplevel menu handlers-------------------------
 def help(event):
     helpMsg()
 
@@ -102,17 +105,18 @@ def on_closing():
             #ADD LINES LATER!
         window.destroy()
 
-# Serial communication
+# -------------------Serial communication control buttons---------------------
 def serialConnect(widget):
+    global connectCtrl
     mySerial.baudrate = combo2.get()
     mySerial.timeout = 1
-    #mySerial.bytesize = 8
+    #mySerial.bytesize = 8  # default settings
     #mySerial.stopbits = 1
     #mySerial.parity = 'N'
-    if len(portList) > 0:
+    if len(portList) > 0:  # if any device is connected then inicialize serial connection on selected device
         mySerial.port = portList[combo1.current()].device
         mySerial.open()
-        global connectCtrl
+
         connectCtrl = True
         widget.configure(text="Disconnect from Arduino\n(btn8)",
                          command=lambda: serialDisconnect(widget))
@@ -124,27 +128,27 @@ def serialDisconnect(widget):
     widget.configure(text="Connect to Arduino\n(btn8)",
                      command=lambda: serialConnect(widget))
 
-#graph refreshing from file
-def animate2(i):
-    dataFile = open("sampleText.txt", "r")
-    pullData = dataFile.read()
-    dataList = pullData.split('\n')
-    xList = []
-    yList = []
-    for eachLine in dataList:
-        if len(eachLine) > 1:  # precaution not to read empty line
-            x, y = eachLine.split(',')
-            xList.append(float(x))
-            yList.append(float(y))
+# -------------------------graph refreshing from file---------------------
+#def animate2(i):  # debugging
+#    dataFile = open("sampleText.txt", "r")
+#    pullData = dataFile.read()
+#    dataList = pullData.split('\n')
+#    xList = []
+#    yList = []
+#    for eachLine in dataList:
+#        if len(eachLine) > 1:  # precaution not to read empty line
+#            x, y = eachLine.split(',')
+#            xList.append(float(x))
+#            yList.append(float(y))
+#
+#    a2.clear()  # always draw just current graph
+#    a2.plot(xList, yList)
 
-    a2.clear()  # always draw just current graph
-    a2.plot(xList, yList)
-
-def switchGraphFreeze(event):
+def switchGraphFreeze(event):  # freeze graphs control method
     global freezeGraphs
     freezeGraphs = not freezeGraphs
 
-
+# ------------------------main animation method--------------------
 def animate(i):
     global receivedList, dataIndex, freezeGraphs
     dataInd = dataIndex
@@ -157,21 +161,23 @@ def animate(i):
             accList[j][i] = receivedList[i].acc[j]  # to turn the "array"
             gyrList[j][i] = receivedList[i].gyro[j]
 
-    if dataInd > 0:
+    if dataInd > 0:  # if received list is not empty
+        #  plots formatting
         left1, right1 = a1.get_xlim()
         bottom1, top1 = a1.get_ylim()
         left2, right2 = a2.get_xlim()
         bottom2, top2 = a2.get_ylim()
+        # data drawing on the left plot
         a1.clear()  # always draw just current graph
         a1.plot(tList, gyrList[0], "#FF0000")
         a1.plot(tList, gyrList[1], "#BB1111")
         a1.plot(tList, gyrList[2], "#885555")
-
+        # data drawing on the right plot
         a2.clear()
         a2.plot(tList, accList[0], "#FF0000") #x
         a2.plot(tList, accList[1], "#00FF00") #y
         a2.plot(tList, accList[2], "#0000FF") #z
-
+        # freeze graph for on-sight analysis
         if freezeGraphs:
             a1.set_xlim(left1, right1)
             a1.set_ylim(bottom1, top1)
@@ -179,15 +185,16 @@ def animate(i):
             a2.set_ylim(bottom2, top2)
 
 
-#Data management
+# *********************Data management*******************************
 def saveToFile(receivedList):
-    if len(receivedList):
-        currentTime = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") #string of current time with 1 sec accuracy
+    if len(receivedList):  # if received list is not empty
+        currentTime = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")  # string of current time with 1 sec accuracy
 
         #dataFile = open("Data from test "+currentTime+".txt", "w")
+        # saving to excel
         book = xlwt.Workbook()
         sheet = book.add_sheet("Test results")
-        row = sheet.row(0)
+        row = sheet.row(0)  # the first row
         row.write(0, "t, s")
         row.write(1, "ax, m/s^2")
         row.write(2, "ay, m/s^2")
@@ -209,39 +216,40 @@ def saveToFile(receivedList):
         print("Data saved to \"Data from test"+currentTime+".xls\"")
 
 
-def saveToFile2(receivedList): #older version
-    if len(receivedList):  # if longer than
-        currentTime = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") #string of current time with 1 sec accuracy
-        dataFile = open("Data from test "+currentTime+".txt", "w")
-        for receivedData in receivedList:
-            dataFile.write("t:"+str(receivedData.time)+"\n")
-            dataFile.write("acc:")
-            for i in range(0, 3):
-                dataFile.write(str(receivedData.acc[i]))
-            dataFile.write("\n")
-            dataFile.write("gyr:")
-            for i in range(0, 3):
-                dataFile.write(str(receivedData.gyro[i]))
-            dataFile.write("\n")
-        dataFile.close()
+#def saveToFile2(receivedList):  # older version, saving to text file
+#    if len(receivedList):  # if longer than
+#        currentTime = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") #string of current time with 1 sec accuracy
+#        dataFile = open("Data from test "+currentTime+".txt", "w")
+#        for receivedData in receivedList:
+#            dataFile.write("t:"+str(receivedData.time)+"\n")
+#            dataFile.write("acc:")
+#            for i in range(0, 3):
+#                dataFile.write(str(receivedData.acc[i]))
+#            dataFile.write("\n")
+#            dataFile.write("gyr:")
+#            for i in range(0, 3):
+#                dataFile.write(str(receivedData.gyro[i]))
+#            dataFile.write("\n")
+#        dataFile.close()
 
+# loading data for windtunnel testing
 def loadFromFile():
     global timeList, serList
-    t = []
-    ser = []
+    t = []  # time
+    ser = []  # position of servos in degrees
     errOccurred = False
     fileName = filedialog.askopenfilename(title="Select File", filetypes=(("MS Excell workbooks","*.xlsx *xls"),("Text files","*.txt"),("all files","*.*")))
     #print(fileName)
 
     if fileName != "":
-        extension = fileName.split(".")[1]
-        if (extension == "xlsx") or (extension== "xls"):
-            f = xlrd.open_workbook(fileName)
-            sheet = f.sheet_by_index(0) #OpenFirstSheet Indexation starts from 0!
+        extension = fileName.split(".")[1]  # "file.xls"
+        if (extension == "xlsx") or (extension == "xls"):
+            f = xlrd.open_workbook(fileName)  # file object
+            sheet = f.sheet_by_index(0)  # OpenFirstSheet Indexation starts from 0!
             for i in range(1, sheet.nrows):
                 try:
                     t.append(sheet.cell_value(i, 0))
-                    s = []
+                    s = []  # positions of servos on current line
                     for pos in sheet.row_values(i, 1, 5):  #i.e. 1,2,3,4
                         s.append(int(pos))
                     ser.append(s)
@@ -249,7 +257,7 @@ def loadFromFile():
                     print("File read error!\nCheck your file.")
                     errOccurred = True
                     break
-        elif extension == "txt":
+        elif extension == "txt":  # if we open text file with testing program
             f = open(fileName, "r")
             for line in f:
                 line = line.strip()
@@ -272,12 +280,12 @@ def loadFromFile():
         else:
             print("Loading error has occurred.")
 
-        timeList = t[:]
+        timeList = t[:]  # saving to global arrays
         serList = ser[:]
     else:
         print("No file selected")
 
-def parseSer(line):
+def parseSer(line):  # for reading from textfile
     ser = []
     line = line[4:] #ser:12,15,48
     inStrList = line.split(",")
@@ -285,14 +293,15 @@ def parseSer(line):
         ser.append(int(s))
     return ser[:]  #[;] is not necessary, but better save than sorry
 
+# ***********************received data management******************************
 def updateData():
     global dataIndex
     acc = []
     gyro = []
     t = 0
-    dataComplete = True
+    dataComplete = True  # to keep track whether data triplet is complete
     try:
-        for i in range(0, 3):
+        for i in range(0, 3):  # read data triplet
             inStr = mySerial.readline()
             print(inStr)
             inStr = inStr.decode()
@@ -317,13 +326,13 @@ def updateData():
                 print(inStr)
                 break #!!! try make something better
         if dataComplete:
-            receivedList[dataIndex] = ArduinoData(t, acc, gyro)
+            receivedList[dataIndex] = ArduinoData(t, acc, gyro)  # if the triplet is complete, save to main data array
             dataIndex += 1
     except:
         print("Data read error: ")
         e = sys.exc_info()[0]
         print(e)
-
+# send servo positions to rocket
 def sendData():
     global serList, sendIndex
     mySerial.write(b"ser\n")
@@ -338,11 +347,10 @@ def clearData():
         receivedList = [None] * dataCount
         dataIndex = 0
 
-
-
+# manual servo positions input
 def sendServoPositions():
     global serList
-    serList = [["","","",""]]
+    serList = [["","","",""]] # clear servo global positions array
     serList[0][0] = spin1.get()
     serList[0][1] = spin2.get()
     serList[0][2] = spin3.get()
@@ -367,7 +375,7 @@ def setServoZero():
             print("sending zero positions input")
             sendData()
 
-
+# neutral positions of fins
 def setFinZero():
     global serList, finZero
     serList = [["","","",""]] # clear serList(preprogramed positions)
@@ -380,7 +388,7 @@ def setFinZero():
             print("sending zero tail fin positions input")
             sendData()
 
-
+# ---------------Wind tunnel testing program-----------------
 def startSending():  #starts preprogramed instructions sending
     global sendCtrl, beginningTime
     if not sendCtrl:
@@ -417,7 +425,7 @@ def streamControl(widget):
 
 
 
-# GUI
+# ************************************GUI********************************************
 window = Tk()
 window.title("Управление аэродинамическими испытаниями")
 window.bind('<F>', switchGraphFreeze)
@@ -549,10 +557,10 @@ combo2["values"]=baudrates
 combo2.current(2)
 combo2.grid(column=3, row=1)
 
-# ***Frame4***
+# ***********Frame4******************
 frame4 = Frame(window, bd=10)
 frame4.grid(row=0, column=0)
-#Matplotlib
+# ---------------------Matplotlib---------------------
 #Graphs
 style.use("ggplot") #change later to custom style
 f = Figure(figsize=(10,5), dpi=100) # figsize = width*height find out what does what
@@ -563,22 +571,17 @@ a2 = f.add_subplot(122) #probably 112
 
 canvas = FigureCanvasTkAgg(f, frame4)
 canvas.draw()
-canvas.get_tk_widget().pack()#grid(row=0, column=0) #otherwise ther is an err with toolbar
+canvas.get_tk_widget().pack()#grid(row=0, column=0) #otherwise there is an err with toolbar
 
 toolbar = NavigationToolbar2Tk(canvas, frame4)
 toolbar.update()
 canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=True)#grid(column=1, row=1)
 
 #graph animation
-ani = matplotlib.animation.FuncAnimation(f, animate, interval=1000) #gives the interval in ms internally to animate(i)
+ani = matplotlib.animation.FuncAnimation(f, animate, interval=500) #gives the interval in ms internally to animate(i)
 
 #serial handler
 window.after(0, serialHandler) #execute as ofthen as possible
 
-window.protocol("WM_DELETE_WINDOW", on_closing)
-window.mainloop()
-print(list(receivedList))  # debugging
-
-
-
-
+window.protocol("WM_DELETE_WINDOW", on_closing)  # call on_closing when we try to terminate a program
+window.mainloop()  # GUI start
